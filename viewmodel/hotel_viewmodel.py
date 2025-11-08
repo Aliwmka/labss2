@@ -82,7 +82,7 @@ class HotelViewModel:
 
     def delete_hotel(self, hotel_id: int):
         # Проверяем, есть ли номера в этом отеле
-        from main import room_vm
+        from custom_main_hotel import room_vm
         rooms_in_hotel = [room for room in room_vm.rooms if room.hotel_id == hotel_id]
         if rooms_in_hotel:
             raise ValueError("Нельзя удалить отель, в котором есть номера.")
