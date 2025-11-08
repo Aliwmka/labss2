@@ -17,18 +17,66 @@
   },
   {
     "id": 3,
-    "hotel_id": 2,
+    "hotel_id": 1,
     "room_number": "301",
+    "room_type": "Премиум",
+    "price_per_night": 20000.0,
+    "is_available": true
+  },
+  {
+    "id": 4,
+    "hotel_id": 2,
+    "room_number": "102",
     "room_type": "Бизнес",
     "price_per_night": 8000.0,
     "is_available": true
   },
   {
-    "id": 4,
+    "id": 5,
+    "hotel_id": 2,
+    "room_number": "202",
+    "room_type": "Люкс",
+    "price_per_night": 15000.0,
+    "is_available": true
+  },
+  {
+    "id": 6,
     "hotel_id": 3,
-    "room_number": "401",
+    "room_number": "103",
     "room_type": "Стандарт",
     "price_per_night": 3000.0,
+    "is_available": true
+  },
+  {
+    "id": 7,
+    "hotel_id": 3,
+    "room_number": "203",
+    "room_type": "Бизнес",
+    "price_per_night": 5000.0,
+    "is_available": false
+  },
+  {
+    "id": 8,
+    "hotel_id": 4,
+    "room_number": "104",
+    "room_type": "Стандарт",
+    "price_per_night": 4000.0,
+    "is_available": true
+  },
+  {
+    "id": 9,
+    "hotel_id": 5,
+    "room_number": "105",
+    "room_type": "Эконом",
+    "price_per_night": 2500.0,
+    "is_available": true
+  },
+  {
+    "id": 10,
+    "hotel_id": 6,
+    "room_number": "301",
+    "room_type": "Президентский",
+    "price_per_night": 35000.0,
     "is_available": true
   }
 ]
