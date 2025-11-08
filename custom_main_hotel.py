@@ -4,12 +4,15 @@ from view.custom_room_window import CustomRoomWindow
 from viewmodel.hotel_viewmodel import HotelViewModel
 from viewmodel.room_viewmodel import RoomViewModel
 from service.json_service import JSONService
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib
+matplotlib.use('TkAgg')
 
 class CustomMainWindow(ctk.CTk):
     def __init__(self, hotel_vm, room_vm):
         super().__init__()
         
-        # Настройка темы и цветов в золотых тонах
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
         
@@ -17,13 +20,14 @@ class CustomMainWindow(ctk.CTk):
         self.geometry("1300x750")
         self.hotel_vm = hotel_vm
         self.room_vm = room_vm
+        self.current_section = "hotels"
         
         self.create_sidebar()
         self.create_main_content()
         self.refresh_data()
 
     def create_sidebar(self):
-        """Создание боковой панели в стиле люкс"""
+        """Создание боковой панели"""
         self.sidebar = ctk.CTkFrame(self, width=280, corner_radius=0, fg_color="#1a1a1a")
         self.sidebar.pack(side="left", fill="y")
         self.sidebar.pack_propagate(False)
@@ -51,16 +55,17 @@ class CustomMainWindow(ctk.CTk):
         nav_frame.pack(pady=30, padx=15, fill="x")
         
         nav_items = [
-            ("🏨 Отели", self.show_hotels_section, "#FFD700"),
-            ("🛏️ Номера", self.show_rooms_section, "#FF6B35"),
-            ("📊 Статистика", self.show_stats_section, "#00CED1")
+            ("🏨 Отели", "hotels", "#FFD700"),
+            ("🛏️ Номера", "rooms", "#FF6B35"),
+            ("📊 Отчеты", "reports", "#00CED1")
         ]
         
-        for text, command, color in nav_items:
+        self.nav_buttons = {}
+        for text, section, color in nav_items:
             btn = ctk.CTkButton(
                 nav_frame,
                 text=text,
-                command=command,
+                command=lambda s=section: self.show_section(s),
                 fg_color=color,
                 hover_color=self.adjust_color(color, -30),
                 height=45,
@@ -68,36 +73,7 @@ class CustomMainWindow(ctk.CTk):
                 corner_radius=8
             )
             btn.pack(pady=8, fill="x")
-        
-        # Быстрые действия
-        quick_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        quick_frame.pack(pady=20, padx=15, fill="x")
-        
-        ctk.CTkLabel(
-            quick_frame, 
-            text="БЫСТРЫЕ ДЕЙСТВИЯ", 
-            font=ctk.CTkFont(size=12, weight="bold"),
-            text_color="#FFD700"
-        ).pack(anchor="w", pady=(0, 10))
-        
-        quick_actions = [
-            ("➕ Новый отель", self.open_hotels_management),
-            ("🛏️ Добавить номер", self.open_rooms_management)
-        ]
-        
-        for text, command in quick_actions:
-            btn = ctk.CTkButton(
-                quick_frame,
-                text=text,
-                command=command,
-                fg_color="transparent",
-                border_color="#FFD700",
-                border_width=2,
-                hover_color="#2a2a2a",
-                height=35,
-                font=ctk.CTkFont(size=12)
-            )
-            btn.pack(pady=4, fill="x")
+            self.nav_buttons[section] = btn
         
         # Статистика
         self.create_sidebar_stats()
@@ -106,20 +82,17 @@ class CustomMainWindow(ctk.CTk):
         theme_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         theme_frame.pack(side="bottom", pady=20, padx=15, fill="x")
         
-        ctk.CTkLabel(theme_frame, text="Оформление:", text_color="#b0b0b0").pack(anchor="w")
         self.theme_switch = ctk.CTkSwitch(
             theme_frame, 
             text="Тёмная тема", 
             command=self.toggle_theme,
-            progress_color="#FFD700",
-            onvalue="dark", 
-            offvalue="light"
+            progress_color="#FFD700"
         )
         self.theme_switch.pack(pady=5, anchor="w")
         self.theme_switch.select()
 
     def create_sidebar_stats(self):
-        """Создание блока статистики в сайдбаре"""
+        """Создание блока статистики"""
         stats_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         stats_frame.pack(pady=20, padx=15, fill="x")
         
@@ -165,140 +138,238 @@ class CustomMainWindow(ctk.CTk):
         self.main_content = ctk.CTkFrame(self, corner_radius=0, fg_color="#1e1e1e")
         self.main_content.pack(side="right", fill="both", expand=True)
         
-        # Верхняя панель
-        self.create_top_panel()
+        # Создаем фреймы для разных разделов
+        self.hotels_frame = ctk.CTkFrame(self.main_content, corner_radius=0)
+        self.rooms_frame = ctk.CTkFrame(self.main_content, corner_radius=0)
+        self.reports_frame = ctk.CTkFrame(self.main_content, corner_radius=0)
         
-        # Контент
-        self.create_content_area()
+        self.create_hotels_section()
+        self.create_rooms_section()
+        self.create_reports_section()
+        
+        # Показываем начальный раздел
+        self.show_section("hotels")
 
-    def create_top_panel(self):
-        """Создание верхней панели"""
-        top_panel = ctk.CTkFrame(self.main_content, height=80, fg_color="#2a2a2a", corner_radius=0)
-        top_panel.pack(fill="x", padx=0, pady=0)
+    def create_hotels_section(self):
+        """Создание раздела отелей"""
+        # Верхняя панель
+        top_panel = ctk.CTkFrame(self.hotels_frame, height=80, fg_color="#2a2a2a", corner_radius=0)
+        top_panel.pack(fill="x")
         top_panel.pack_propagate(False)
         
-        # Заголовок раздела
-        self.section_title = ctk.CTkLabel(
+        title_label = ctk.CTkLabel(
             top_panel,
-            text="🏨 ОБЗОР СИСТЕМЫ",
+            text="🏨 УПРАВЛЕНИЕ ОТЕЛЯМИ",
             font=ctk.CTkFont(size=22, weight="bold"),
             text_color="#FFD700"
         )
-        self.section_title.pack(side="left", padx=30, pady=25)
+        title_label.pack(side="left", padx=30, pady=25)
+        
+        # Кнопки управления
+        actions_frame = ctk.CTkFrame(top_panel, fg_color="transparent")
+        actions_frame.pack(side="right", padx=30, pady=20)
+        
+        ctk.CTkButton(
+            actions_frame,
+            text="➕ Добавить отель",
+            command=self.open_hotels_management,
+            fg_color="#27ae60",
+            hover_color="#219a52",
+            width=140,
+            height=35
+        ).pack(side="left", padx=5)
         
         # Поиск и фильтры
-        search_frame = ctk.CTkFrame(top_panel, fg_color="transparent")
-        search_frame.pack(side="right", padx=30, pady=20)
+        search_frame = ctk.CTkFrame(self.hotels_frame, fg_color="transparent")
+        search_frame.pack(fill="x", padx=20, pady=15)
         
-        self.search_entry = ctk.CTkEntry(
+        self.hotels_search_entry = ctk.CTkEntry(
             search_frame,
-            placeholder_text="🔍 Поиск отелей или номеров...",
-            width=250,
+            placeholder_text="🔍 Поиск отелей...",
             height=35
         )
-        self.search_entry.pack(side="left", padx=(0, 10))
-        self.search_entry.bind("<KeyRelease>", self.on_search)
+        self.hotels_search_entry.pack(side="left", fill="x", expand=True)
+        self.hotels_search_entry.bind("<KeyRelease>", lambda e: self.refresh_hotels_data())
+        
+        # Таблица отелей
+        self.create_hotels_table()
 
-    def create_content_area(self):
-        """Создание области контента"""
-        # Приветственный баннер
-        banner_frame = ctk.CTkFrame(self.main_content, fg_color="#2a2a2a", corner_radius=12)
-        banner_frame.pack(fill="x", padx=20, pady=20)
+    def create_rooms_section(self):
+        """Создание раздела номеров"""
+        top_panel = ctk.CTkFrame(self.rooms_frame, height=80, fg_color="#2a2a2a", corner_radius=0)
+        top_panel.pack(fill="x")
+        top_panel.pack_propagate(False)
         
-        banner_content = ctk.CTkFrame(banner_frame, fg_color="transparent")
-        banner_content.pack(padx=25, pady=20, fill="x")
-        
-        ctk.CTkLabel(
-            banner_content,
-            text="Добро пожаловать в Luxury Hotel System",
-            font=ctk.CTkFont(size=20, weight="bold"),
-            text_color="#FFD700"
-        ).pack(anchor="w")
-        
-        ctk.CTkLabel(
-            banner_content,
-            text="Управляйте отелями и номерами с комфортом и стилем",
-            font=ctk.CTkFont(size=14),
-            text_color="#b0b0b0"
-        ).pack(anchor="w", pady=(5, 0))
-        
-        # Основная таблица
-        self.create_main_table()
-
-    def create_main_table(self):
-        """Создание основной таблицы"""
-        content_frame = ctk.CTkFrame(self.main_content, fg_color="transparent")
-        content_frame.pack(fill="both", expand=True, padx=20, pady=(0, 20))
-        
-        # Заголовок таблицы
-        table_header = ctk.CTkFrame(content_frame, fg_color="transparent")
-        table_header.pack(fill="x", pady=(0, 15))
-        
-        ctk.CTkLabel(
-            table_header, 
-            text="🏨 ВСЕ ОТЕЛИ", 
-            font=ctk.CTkFont(size=18, weight="bold")
-        ).pack(side="left")
-        
-        # Фильтры
-        filter_frame = ctk.CTkFrame(table_header, fg_color="transparent")
-        filter_frame.pack(side="right")
-        
-        self.stars_filter = ctk.CTkComboBox(
-            filter_frame,
-            values=["Все звезды", "5 звезд", "4 звезды", "3 звезды"],
-            width=120,
-            height=32
+        title_label = ctk.CTkLabel(
+            top_panel,
+            text="🛏️ УПРАВЛЕНИЕ НОМЕРАМИ",
+            font=ctk.CTkFont(size=22, weight="bold"),
+            text_color="#FF6B35"
         )
-        self.stars_filter.pack(side="left", padx=(0, 10))
-        self.stars_filter.set("Все звезды")
-        self.stars_filter.bind("<<ComboboxSelected>>", self.on_filter)
+        title_label.pack(side="left", padx=30, pady=25)
         
-        # Таблица
-        self.create_hotels_table(content_frame)
+        actions_frame = ctk.CTkFrame(top_panel, fg_color="transparent")
+        actions_frame.pack(side="right", padx=30, pady=20)
+        
+        ctk.CTkButton(
+            actions_frame,
+            text="➕ Добавить номер",
+            command=self.open_rooms_management,
+            fg_color="#27ae60",
+            hover_color="#219a52",
+            width=140,
+            height=35
+        ).pack(side="left", padx=5)
+        
+        search_frame = ctk.CTkFrame(self.rooms_frame, fg_color="transparent")
+        search_frame.pack(fill="x", padx=20, pady=15)
+        
+        self.rooms_search_entry = ctk.CTkEntry(
+            search_frame,
+            placeholder_text="🔍 Поиск номеров...",
+            height=35
+        )
+        self.rooms_search_entry.pack(side="left", fill="x", expand=True)
+        self.rooms_search_entry.bind("<KeyRelease>", lambda e: self.refresh_rooms_data())
+        
+        # Таблица номеров
+        self.create_rooms_table()
 
-    def create_hotels_table(self, parent):
+    def create_reports_section(self):
+        """Создание раздела отчетов"""
+        top_panel = ctk.CTkFrame(self.reports_frame, height=80, fg_color="#2a2a2a", corner_radius=0)
+        top_panel.pack(fill="x")
+        top_panel.pack_propagate(False)
+        
+        title_label = ctk.CTkLabel(
+            top_panel,
+            text="📊 ОТЧЕТЫ И АНАЛИТИКА",
+            font=ctk.CTkFont(size=22, weight="bold"),
+            text_color="#00CED1"
+        )
+        title_label.pack(side="left", padx=30, pady=25)
+        
+        # Кнопки отчетов
+        reports_buttons_frame = ctk.CTkFrame(self.reports_frame, fg_color="transparent")
+        reports_buttons_frame.pack(pady=20)
+        
+        reports = [
+            ("🏨 Статистика отелей", self.show_hotels_stats),
+            ("🛏️ Статистика номеров", self.show_rooms_stats),
+            ("💰 Анализ цен", self.show_pricing_stats)
+        ]
+        
+        for text, command in reports:
+            ctk.CTkButton(
+                reports_buttons_frame,
+                text=text,
+                command=command,
+                width=200,
+                height=40,
+                font=ctk.CTkFont(size=12)
+            ).pack(pady=5)
+        
+        # Фрейм для графиков
+        self.chart_frame = ctk.CTkFrame(self.reports_frame)
+        self.chart_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+    def create_hotels_table(self):
         """Создание таблицы отелей"""
         columns = ("ID", "Отель", "Город", "Звезды", "Бассейн", "Номеров")
-        self.tree_frame = ctk.CTkFrame(parent)
-        self.tree_frame.pack(fill="both", expand=True)
         
-        # Стилизация Treeview
         from tkinter import ttk
         style = ttk.Style()
         style.theme_use("default")
-        style.configure("Luxury.Treeview", 
+        style.configure("Hotels.Treeview", 
                        background="#2a2d2e",
                        foreground="white",
                        fieldbackground="#2a2d2e",
-                       rowheight=32,
-                       font=('TkDefaultFont', 11))
-        style.configure("Luxury.Treeview.Heading", 
+                       rowheight=32)
+        style.configure("Hotels.Treeview.Heading", 
                        background="#3b3b3b",
                        foreground="#FFD700",
-                       relief="flat",
-                       font=('TkDefaultFont', 12, 'bold'))
-        style.map('Luxury.Treeview', background=[('selected', '#1f6aa5')])
+                       relief="flat")
+        style.map('Hotels.Treeview', background=[('selected', '#1f6aa5')])
         
-        self.tree = ttk.Treeview(self.tree_frame, columns=columns, show="headings", 
-                               style="Luxury.Treeview", height=18)
+        self.hotels_tree = ttk.Treeview(self.hotels_frame, columns=columns, show="headings", 
+                                      style="Hotels.Treeview", height=15)
         
-        # Настройка колонок
         column_config = {
             "ID": 70, "Отель": 250, "Город": 150, 
             "Звезды": 100, "Бассейн": 100, "Номеров": 100
         }
         
         for col in columns:
-            self.tree.heading(col, text=col)
-            self.tree.column(col, width=column_config[col])
+            self.hotels_tree.heading(col, text=col)
+            self.hotels_tree.column(col, width=column_config[col])
         
-        # Скроллбар
-        scrollbar = ttk.Scrollbar(self.tree_frame, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=scrollbar.set)
+        scrollbar = ttk.Scrollbar(self.hotels_frame, orient="vertical", command=self.hotels_tree.yview)
+        self.hotels_tree.configure(yscrollcommand=scrollbar.set)
         
-        self.tree.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        self.hotels_tree.pack(fill="both", expand=True, padx=20, pady=10)
+        scrollbar.pack(side="right", fill="y", padx=(0, 20), pady=10)
+
+    def create_rooms_table(self):
+        """Создание таблицы номеров"""
+        columns = ("ID", "Отель", "Номер", "Тип", "Цена", "Статус")
+        
+        from tkinter import ttk
+        style = ttk.Style()
+        style.theme_use("default")
+        style.configure("Rooms.Treeview", 
+                       background="#2a2d2e",
+                       foreground="white",
+                       fieldbackground="#2a2d2e",
+                       rowheight=32)
+        style.configure("Rooms.Treeview.Heading", 
+                       background="#3b3b3b",
+                       foreground="#FF6B35",
+                       relief="flat")
+        style.map('Rooms.Treeview', background=[('selected', '#1f6aa5')])
+        
+        self.rooms_tree = ttk.Treeview(self.rooms_frame, columns=columns, show="headings", 
+                                     style="Rooms.Treeview", height=15)
+        
+        column_config = {
+            "ID": 70, "Отель": 200, "Номер": 80, 
+            "Тип": 120, "Цена": 120, "Статус": 100
+        }
+        
+        for col in columns:
+            self.rooms_tree.heading(col, text=col)
+            self.rooms_tree.column(col, width=column_config[col])
+        
+        scrollbar = ttk.Scrollbar(self.rooms_frame, orient="vertical", command=self.rooms_tree.yview)
+        self.rooms_tree.configure(yscrollcommand=scrollbar.set)
+        
+        self.rooms_tree.pack(fill="both", expand=True, padx=20, pady=10)
+        scrollbar.pack(side="right", fill="y", padx=(0, 20), pady=10)
+
+    def show_section(self, section):
+        """Показать выбранный раздел"""
+        # Скрыть все разделы
+        self.hotels_frame.pack_forget()
+        self.rooms_frame.pack_forget()
+        self.reports_frame.pack_forget()
+        
+        # Сбросить цвета кнопок
+        for btn in self.nav_buttons.values():
+            btn.configure(fg_color=["#3B8ED0", "#1F6AA5"])
+        
+        # Показать выбранный раздел и подсветить кнопку
+        if section == "hotels":
+            self.hotels_frame.pack(fill="both", expand=True)
+            self.nav_buttons["hotels"].configure(fg_color="#FFD700")
+            self.refresh_hotels_data()
+        elif section == "rooms":
+            self.rooms_frame.pack(fill="both", expand=True)
+            self.nav_buttons["rooms"].configure(fg_color="#FF6B35")
+            self.refresh_rooms_data()
+        elif section == "reports":
+            self.reports_frame.pack(fill="both", expand=True)
+            self.nav_buttons["reports"].configure(fg_color="#00CED1")
+        
+        self.current_section = section
 
     def adjust_color(self, color, amount):
         """Регулировка яркости цвета"""
@@ -312,50 +383,18 @@ class CustomMainWindow(ctk.CTk):
 
     def toggle_theme(self):
         """Переключение темы"""
-        if self.theme_switch.get() == "dark":
+        if self.theme_switch.get():
             ctk.set_appearance_mode("dark")
         else:
             ctk.set_appearance_mode("light")
 
-    def show_hotels_section(self):
-        """Показать раздел отелей"""
-        self.section_title.configure(text="🏨 УПРАВЛЕНИЕ ОТЕЛЯМИ")
-        self.refresh_hotels_data()
-
-    def show_rooms_section(self):
-        """Показать раздел номеров"""
-        self.section_title.configure(text="🛏️ УПРАВЛЕНИЕ НОМЕРАМИ")
-        self.refresh_rooms_data()
-
-    def show_stats_section(self):
-        """Показать раздел статистики"""
-        self.section_title.configure(text="📊 СТАТИСТИКА СИСТЕМЫ")
-        self.refresh_stats_display()
-
-    def open_hotels_management(self):
-        """Открыть управление отелями"""
-        window = CustomHotelWindow(self, self.hotel_vm)
-        self.wait_window(window)
-        self.refresh_data()
-
-    def open_rooms_management(self):
-        """Открыть управление номерами"""
-        window = CustomRoomWindow(self, self.room_vm, self.hotel_vm)
-        self.wait_window(window)
-        self.refresh_data()
-
-    def on_search(self, event):
-        """Обработка поиска"""
-        self.refresh_data()
-
-    def on_filter(self, event):
-        """Обработка фильтра"""
-        self.refresh_data()
-
     def refresh_data(self):
         """Обновление всех данных"""
         self.refresh_stats()
-        self.refresh_hotels_data()
+        if self.current_section == "hotels":
+            self.refresh_hotels_data()
+        elif self.current_section == "rooms":
+            self.refresh_rooms_data()
 
     def refresh_stats(self):
         """Обновление статистики"""
@@ -371,40 +410,183 @@ class CustomMainWindow(ctk.CTk):
 
     def refresh_hotels_data(self):
         """Обновление данных отелей"""
-        for item in self.tree.get_children():
-            self.tree.delete(item)
+        for item in self.hotels_tree.get_children():
+            self.hotels_tree.delete(item)
         
-        search_term = self.search_entry.get().lower()
-        stars_filter = self.stars_filter.get()
+        search_term = self.hotels_search_entry.get().lower() if hasattr(self, 'hotels_search_entry') else ""
         
         for hotel in self.hotel_vm.hotels:
-            if search_term and search_term not in hotel.name.lower() and search_term not in hotel.city.lower():
+            if search_term and (search_term not in hotel.name.lower() and 
+                              search_term not in hotel.city.lower()):
                 continue
-                
-            if stars_filter != "Все звезды":
-                required_stars = int(stars_filter[0])
-                if hotel.stars != required_stars:
-                    continue
             
             # Подсчет номеров в отеле
             room_count = sum(1 for room in self.room_vm.rooms if room.hotel_id == hotel.id)
-            
             pool = "✅ Есть" if hotel.has_pool else "❌ Нет"
             stars_display = "⭐" * hotel.stars
             
-            self.tree.insert("", "end", values=(
+            self.hotels_tree.insert("", "end", values=(
                 hotel.id, hotel.name, hotel.city, stars_display, pool, room_count
             ))
 
     def refresh_rooms_data(self):
         """Обновление данных номеров"""
-        # В реальном приложении можно переключать таблицу
-        pass
+        for item in self.rooms_tree.get_children():
+            self.rooms_tree.delete(item)
+        
+        search_term = self.rooms_search_entry.get().lower() if hasattr(self, 'rooms_search_entry') else ""
+        
+        # Создаем словарь для быстрого доступа к отелям
+        hotel_map = {hotel.id: hotel.name for hotel in self.hotel_vm.hotels}
+        
+        for room in self.room_vm.rooms:
+            hotel_name = hotel_map.get(room.hotel_id, "Неизвестно")
+            
+            if search_term and (search_term not in room.room_number.lower() and 
+                              search_term not in hotel_name.lower()):
+                continue
+            
+            status = "✅ Доступен" if room.is_available else "❌ Занят"
+            price = f"{room.price_per_night:,.0f} руб.".replace(",", " ")
+            
+            self.rooms_tree.insert("", "end", values=(
+                room.id, hotel_name, room.room_number, room.room_type, price, status
+            ))
 
-    def refresh_stats_display(self):
-        """Обновление отображения статистики"""
-        # В реальном приложении можно показать графики и диаграммы
-        pass
+    def open_hotels_management(self):
+        """Открыть управление отелями"""
+        window = CustomHotelWindow(self, self.hotel_vm)
+        self.wait_window(window)
+        self.refresh_data()
+
+    def open_rooms_management(self):
+        """Открыть управление номерами"""
+        window = CustomRoomWindow(self, self.room_vm, self.hotel_vm)
+        self.wait_window(window)
+        self.refresh_data()
+
+    def show_hotels_stats(self):
+        """Показать статистику отелей"""
+        for widget in self.chart_frame.winfo_children():
+            widget.destroy()
+        
+        # Анализ данных отелей
+        cities = {}
+        stars = {}
+        
+        for hotel in self.hotel_vm.hotels:
+            # По городам
+            if hotel.city not in cities:
+                cities[hotel.city] = 0
+            cities[hotel.city] += 1
+            
+            # По звездам
+            if hotel.stars not in stars:
+                stars[hotel.stars] = 0
+            stars[hotel.stars] += 1
+        
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+        
+        # Диаграмма по городам
+        if cities:
+            ax1.pie(cities.values(), labels=cities.keys(), autopct='%1.1f%%', startangle=90)
+            ax1.set_title('Распределение отелей по городам')
+        
+        # Диаграмма по звездам
+        if stars:
+            star_labels = [f"{star}⭐" for star in sorted(stars.keys())]
+            star_values = [stars[star] for star in sorted(stars.keys())]
+            ax2.bar(star_labels, star_values, color=['gold', 'silver', 'brown', 'lightblue', 'lightgreen'])
+            ax2.set_title('Распределение отелей по звездам')
+            ax2.set_ylabel('Количество отелей')
+        
+        plt.tight_layout()
+        
+        canvas = FigureCanvasTkAgg(fig, self.chart_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True)
+
+    def show_rooms_stats(self):
+        """Показать статистику номеров"""
+        for widget in self.chart_frame.winfo_children():
+            widget.destroy()
+        
+        # Анализ данных номеров
+        room_types = {}
+        availability = {"Доступно": 0, "Занято": 0}
+        
+        for room in self.room_vm.rooms:
+            # По типам номеров
+            if room.room_type not in room_types:
+                room_types[room.room_type] = 0
+            room_types[room.room_type] += 1
+            
+            # По доступности
+            if room.is_available:
+                availability["Доступно"] += 1
+            else:
+                availability["Занято"] += 1
+        
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+        
+        # Диаграмма по типам номеров
+        if room_types:
+            ax1.pie(room_types.values(), labels=room_types.keys(), autopct='%1.1f%%', startangle=90)
+            ax1.set_title('Распределение номеров по типам')
+        
+        # Диаграмма по доступности
+        if availability:
+            ax2.pie(availability.values(), labels=availability.keys(), autopct='%1.1f%%', 
+                   colors=['lightgreen', 'lightcoral'], startangle=90)
+            ax2.set_title('Доступность номеров')
+        
+        plt.tight_layout()
+        
+        canvas = FigureCanvasTkAgg(fig, self.chart_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True)
+
+    def show_pricing_stats(self):
+        """Показать анализ цен"""
+        for widget in self.chart_frame.winfo_children():
+            widget.destroy()
+        
+        # Анализ цен по типам номеров
+        prices_by_type = {}
+        
+        for room in self.room_vm.rooms:
+            if room.room_type not in prices_by_type:
+                prices_by_type[room.room_type] = []
+            prices_by_type[room.room_type].append(room.price_per_night)
+        
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        if prices_by_type:
+            types = list(prices_by_type.keys())
+            avg_prices = [sum(prices) / len(prices) for prices in prices_by_type.values()]
+            min_prices = [min(prices) for prices in prices_by_type.values()]
+            max_prices = [max(prices) for prices in prices_by_type.values()]
+            
+            x = range(len(types))
+            width = 0.25
+            
+            ax.bar([i - width for i in x], min_prices, width, label='Мин. цена', color='lightgreen')
+            ax.bar(x, avg_prices, width, label='Средняя цена', color='lightblue')
+            ax.bar([i + width for i in x], max_prices, width, label='Макс. цена', color='lightcoral')
+            
+            ax.set_xlabel('Типы номеров')
+            ax.set_ylabel('Цена (руб.)')
+            ax.set_title('Анализ цен по типам номеров')
+            ax.set_xticks(x)
+            ax.set_xticklabels(types, rotation=45)
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        
+        canvas = FigureCanvasTkAgg(fig, self.chart_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True)
 
 def main():
     json_service = JSONService()

@@ -78,5 +78,13 @@
     "room_type": "Президентский",
     "price_per_night": 35000.0,
     "is_available": true
+  },
+  {
+    "id": 11,
+    "hotel_id": 1,
+    "room_number": "405",
+    "room_type": "Люкс",
+    "price_per_night": 50000.0,
+    "is_available": true
   }
 ]
